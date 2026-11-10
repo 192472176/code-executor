@@ -1,48 +1,53 @@
+import subprocess
 from fastapi import FastAPI
 from pydantic import BaseModel
-import subprocess
-import sys
-import tempfile
-import os
 
 app = FastAPI()
 
 class CodeExecutionRequest(BaseModel):
-    language: str  # "python" or "cpp"
+    language: str
     code: str
+
+DOCKER_IMAGE = "execution-sandbox"
 
 @app.post("/run")
 def run_code(request: CodeExecutionRequest):
+    if request.language not in ["python", "cpp"]:
+        return {"error": "Unsupported language"}
+
     if request.language == "python":
-        try:
-            result = subprocess.run(
-                [sys.executable, "-c", request.code],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            return {"stdout": result.stdout, "stderr": result.stderr, "exit_code": result.returncode}
-        except subprocess.TimeoutExpired:
-            return {"error": "Execution timed out (5s limit)"}
-
+        # Pass Python code directly via stdin using `python3 -`
+        docker_cmd = [
+            "docker", "run", "--rm", "-i",
+            "--network", "none",
+            "--memory", "128m",
+            "--cpus", "0.5",
+            DOCKER_IMAGE,
+            "python3", "-"
+        ]
     elif request.language == "cpp":
-        with tempfile.TemporaryDirectory() as temp_dir:
-            cpp_file = os.path.join(temp_dir, "solution.cpp")
-            exe_file = os.path.join(temp_dir, "solution.exe")
+        # Stream C++ source code to g++ compiler via stdin
+        docker_cmd = [
+            "docker", "run", "--rm", "-i",
+            "--network", "none",
+            "--memory", "128m",
+            "--cpus", "0.5",
+            DOCKER_IMAGE,
+            "sh", "-c", "cat > code.cpp && g++ code.cpp -o app && ./app"
+        ]
 
-            with open(cpp_file, "w") as f:
-                f.write(request.code)
-
-            # Compile C++ code
-            compile_res = subprocess.run(["g++", cpp_file, "-o", exe_file], capture_output=True, text=True)
-            if compile_res.returncode != 0:
-                return {"error": "Compilation Error", "stderr": compile_res.stderr}
-
-            # Run compiled executable
-            try:
-                run_res = subprocess.run([exe_file], capture_output=True, text=True, timeout=5)
-                return {"stdout": run_res.stdout, "stderr": run_res.stderr, "exit_code": run_res.returncode}
-            except subprocess.TimeoutExpired:
-                return {"error": "Execution timed out (5s limit)"}
-
-    return {"error": "Unsupported language"}
+    try:
+        run_res = subprocess.run(
+            docker_cmd,
+            input=request.code,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        return {
+            "stdout": run_res.stdout,
+            "stderr": run_res.stderr,
+            "exit_code": run_res.returncode
+        }
+    except subprocess.TimeoutExpired:
+        return {"error": "Execution timed out (5s limit)"}
