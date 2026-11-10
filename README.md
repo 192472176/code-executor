@@ -1,23 +1,35 @@
 # Multi-Language Remote Code Execution Engine
 
-A fast, lightweight code execution REST API built with Python, FastAPI, and Subprocess. Designed to model the infrastructure core of online assessment platforms like HackerRank.
+A production-grade, secure, and isolated Remote Code Execution (RCE) API built with Python, FastAPI, and Docker. Designed to mirror online judge platforms like HackerRank and LeetCode, this engine safely compiles and executes untrusted code inside sandboxed ephemeral containers with strict resource and security constraints.
+
+---
 
 ## Features
-- **Multi-Language Support**: Executes arbitrary Python 3 and C++ code.
-- **Isolated Workspace**: Uses dynamic temporary directories (`tempfile`) for C++ source compilation and binary execution.
-- **Resource Constraints**: Implements subprocess timeout enforcement (5s execution cap) to mitigate infinite loops.
-- **Interactive Documentation**: Auto-generated Swagger/OpenAPI documentation provided via FastAPI.
+
+- **Multi-Language Support**: Compiles and executes Python 3 and C++ (via `g++`) source code.
+- **Docker Container Sandboxing**: Executes user code inside ephemeral containers to isolate host file systems.
+- **Network Isolation**: Blocks outbound and inbound network access using `--network none`.
+- **Resource Limits**: Restricts memory (`128m`) and CPU cores (`0.5`) to prevent Denial-of-Service (DoS) and infinite loop exploits.
+- **Stdin Streaming**: Streams source code directly into containers via `stdin` to eliminate volume mounting overhead on Windows host environments.
+- **Execution Telemetry**: Captures standard output (`stdout`), standard error (`stderr`), and process exit codes.
+- **Interactive Documentation**: Provides auto-generated Swagger/OpenAPI documentation via FastAPI.
+
+---
 
 ## Tech Stack
+
 - **Language**: Python 3.12
 - **Framework**: FastAPI
 - **Server**: Uvicorn
+- **Containerization**: Docker
 - **Compiler Support**: GNU C++ Compiler (`g++`)
+
+---
 
 ## API Endpoints
 
 ### `POST /run`
-Executes provided code in the specified language environment.
+Executes provided source code within a sandboxed Docker container.
 
 **Request Body:**
 ```json
@@ -25,17 +37,3 @@ Executes provided code in the specified language environment.
   "language": "python",
   "code": "print('Hello World!')"
 }
-```
-**Response Body:**
-```json
-{
-  "stdout": "Hello World!\n",
-  "stderr": "",
-  "exit_code": 0
-}
-```
-## Setup & Running Locally
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/192472176/code-executor.git
-   cd code-executor

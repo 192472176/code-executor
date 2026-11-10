@@ -16,7 +16,6 @@ def run_code(request: CodeExecutionRequest):
         return {"error": "Unsupported language"}
 
     if request.language == "python":
-        # Pass Python code directly via stdin using `python3 -`
         docker_cmd = [
             "docker", "run", "--rm", "-i",
             "--network", "none",
@@ -26,7 +25,6 @@ def run_code(request: CodeExecutionRequest):
             "python3", "-"
         ]
     elif request.language == "cpp":
-        # Stream C++ source code to g++ compiler via stdin
         docker_cmd = [
             "docker", "run", "--rm", "-i",
             "--network", "none",
